@@ -1,0 +1,49 @@
+# Overte Server runtime image. domain-server-builder must be built first.
+FROM domain-server-builder as build
+
+LABEL maintainer="Micah (https://github.com/akamicah)"
+LABEL description="Overte domain server runtime"
+
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TERM=linux
+
+RUN echo UTC >/etc/timezone
+
+RUN echo 'APT::Install-Suggests "0";' >> /etc/apt/apt.conf.d/00-docker
+RUN echo 'APT::Install-Recommends "0";' >> /etc/apt/apt.conf.d/00-docker
+
+# Install dependencies
+RUN apt update && apt install -y tzdata supervisor libopengl-dev ca-certificates \
+    libqt5widgets5 libqt5network5 libqt5script5 libqt5core5a libqt5qml5 libqt5websockets5 libqt5gui5
+
+# Cleanup
+RUN apt clean && rm -rf /var/lib/app/lists/*
+
+# Install libraries
+COPY --from=build /opt/overte/libraries/*/*.so /lib/
+
+# Fetch built services
+RUN mkdir /opt/overte
+COPY --from=build /opt/overte/domain-server /opt/overte
+COPY --from=build /opt/overte/assignment-client /opt/overte
+COPY --from=build /opt/overte/plugins /opt/overte/plugins
+COPY --from=build /opt/overte/resources /opt/overte/resources
+
+RUN chmod +x /opt/overte/domain-server && \
+    chmod +x /opt/overte/assignment-client 
+
+# Server run test
+RUN /opt/overte/domain-server --version > /opt/overte/version && \
+    /opt/overte/assignment-client --version >> /opt/overte/version
+
+# Install supervisor config
+COPY ./files/overte.conf /etc/supervisor/conf.d/overte.conf
+
+# Expose required ports
+EXPOSE 40100 40101 40102
+EXPOSE 40100/udp 40101/udp 40102/udp
+EXPOSE 48000/udp 48001/udp 48002/udp 48003/udp 48004/udp 48005/udp 48006/udp
+
+ENTRYPOINT ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/overte.conf"]

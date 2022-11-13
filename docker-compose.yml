@@ -1,0 +1,15 @@
+services:
+  overte-server:
+    #image: domain-server
+    image: akamicah/overte-domain-server:latest
+    container_name: overte-server
+    restart: unless-stopped
+    expose:
+      - "40100-40102"
+    ports:
+      - "40100-40102:40100-40102"
+      - "40100-40102:40100-40102/udp"
+      - "48000-48006:48000-48006/udp"
+    volumes:
+      - "./logs:/var/log"
+      - "./data:/root/.local/share/Overte"

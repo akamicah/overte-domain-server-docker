@@ -1,0 +1,37 @@
+# Docker environment for building Overte server
+FROM ubuntu:22.04
+
+ARG REPO=https://github.com/overte-org/overte
+ARG TAG=master
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG TERM=linux
+
+RUN mkdir /opt/overte-build \
+    && mkdir /opt/overte
+
+# Install dependencies
+RUN apt update && apt install -y tzdata curl ninja-build git cmake g++ libssl-dev python3-distutils python3-distro mesa-common-dev libgl1-mesa-dev \
+    libqt5websockets5-dev qtscript5-dev qtdeclarative5-dev qtmultimedia5-dev libqt5webchannel5-dev qtwebengine5-dev libqt5xmlpatterns5-dev
+
+# Fetch repository
+RUN git clone --depth 1 --branch $TAG $REPO /opt/overte-build/
+
+RUN apt install -y npm
+
+# Build just the server
+RUN cd /opt/overte-build \
+    && mkdir build \
+    && cd ./build \
+    && export OVERTE_USE_SYSTEM_QT=1 \
+    && export RELEASE_TYPE=PRODUCTION \
+    && cmake -DSERVER_ONLY=1 -DOVERTE_CPU_ARCHITECTURE=-msse3 ..
+
+RUN cd /opt/overte-build/build \
+    && make
+
+RUN mv /opt/overte-build/build/libraries /opt/overte/libraries \
+    && mv /opt/overte-build/build/assignment-client/assignment-client /opt/overte/assignment-client \
+    && mv /opt/overte-build/build/assignment-client/plugins /opt/overte/plugins \
+    && mv /opt/overte-build/build/domain-server/domain-server /opt/overte/domain-server \
+    && mv /opt/overte-build/domain-server/resources /opt/overte/resources
